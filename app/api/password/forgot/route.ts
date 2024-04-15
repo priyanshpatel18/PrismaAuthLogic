@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   // Send Mail and store the response
-  const { data } = await axios.post("/api/sendMail", {
+  const { data } = await axios.post("http://localhost:3000/api/auth/sendMail", {
     email: userExists.email,
     forgotFlag: true,
   });
