@@ -1,6 +1,6 @@
 import otpGenerator from "otp-generator";
-import prisma from "../../db";
-import sendOTP from "../../utils/nodemailer";
+import prisma from "../../../db";
+import sendOTP from "../../../utils/nodemailer";
 
 export async function POST(email: string) {
   if (!email || typeof email !== "string") {

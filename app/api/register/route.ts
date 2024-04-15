@@ -1,15 +1,26 @@
-import { NextRequest, NextResponse } from "next/server";
-import { RegisterUserSchema } from "../../schema/registerSchema";
-import prisma from "../../db";
-import { cookies } from "next/headers";
-import { generateJWT } from "../../lib/auth";
-import { genSalt, hash } from "bcrypt";
 import axios from "axios";
+import { genSalt, hash } from "bcrypt";
+import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "../../../db/index";
+import { generateJWT } from "../../../lib/auth";
+import { RegisterUserSchema } from "../../../schema/registerSchema";
 
 export async function POST(request: NextRequest) {
   const requestBody = await request.json();
   const validateData = RegisterUserSchema.parse(requestBody);
-  const { firstName, lastName, email, password, profilePicture } = validateData;
+  if (
+    validateData.email !== requestBody.email ||
+    validateData.password !== requestBody.password ||
+    validateData.firstName !== requestBody.firstName ||
+    validateData.lastName !== requestBody.lastName
+  ) {
+    return NextResponse.json({
+      status: 400,
+      message: "Invalid Credentials",
+    });
+  }
+  const { firstName, lastName, email, password } = validateData;
 
   const userExists = await prisma.user.findUnique({
     where: {
@@ -29,7 +40,6 @@ export async function POST(request: NextRequest) {
       lastName,
       email,
       password: await hash(password, await genSalt(10)),
-      profilePicture,
       expiresAt: new Date(new Date().getTime() + 10 * 60 * 1000),
     },
   });
