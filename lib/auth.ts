@@ -1,11 +1,8 @@
-import { sign, verify } from "jsonwebtoken";
+import axios from "axios";
 import Credentials from "next-auth/providers/credentials";
-import { cookies } from "next/headers";
-import prisma from "../db/index";
-import { LoginUserSchema } from "../schema/loginSchema";
-import { compare } from "bcrypt";
-import GoogleCredentials from "next-auth/providers/google";
 import GithubCredentials from "next-auth/providers/github";
+import GoogleCredentials from "next-auth/providers/google";
+import { sign } from "jsonwebtoken";
 
 export function generateJWT(payload: any) {
   const SECRET_KEY = process.env.SECRET_KEY || "";
@@ -13,19 +10,34 @@ export function generateJWT(payload: any) {
   return sign({ payload }, SECRET_KEY);
 }
 
-export function verifyJWT(token: string) {
-  const SECRET_KEY = process.env.SECRET_KEY || "";
+export async function verifyUser(email: string, password: string) {
+  const url = "http://localhost:3000/api/auth/login";
 
-  const decodedToken = verify(token, SECRET_KEY);
-  if (
-    !decodedToken ||
-    typeof decodedToken !== "object" ||
-    !decodedToken.payload
-  ) {
-    return { status: 400, message: "Invalid Token" };
+  const headers = {
+    "Client-Service": process.env.APP_CLIENT_SERVICE || "",
+    "Auth-Key": process.env.APP_AUTH_KEY || "",
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  const body = new URLSearchParams();
+  body.append("email", email);
+  body.append("password", password);
+
+  try {
+    const { data } = await axios.post(url, body, { headers });
+    console.log(data);
+
+    if (data.status == 401) {
+      throw new Error(`HTTP error! Status: ${data.status}`);
+    }
+
+    return data as any;
+  } catch (error) {
+    console.error("Error validating user:", error);
+    return {
+      data: null,
+    };
   }
-
-  return { status: 200, payload: decodedToken.payload };
 }
 
 export const authOptions = {
@@ -36,46 +48,20 @@ export const authOptions = {
         email: { label: "email", type: "text", placeholder: "" },
         password: { label: "password", type: "password", placeholder: "" },
       },
-      authorize: async (credentials) => {
-        // Validate Request
-        const { email, password } = LoginUserSchema.parse(credentials);
-        if (!email || !password) {
-          return null;
-        }
+      authorize: async (credentials: any): Promise<any> => {
+        const { user } = await verifyUser(
+          credentials.email,
+          credentials.password
+        );
 
-        try {
-          // Check if User exists
-          const userExists = await prisma.user.findFirst({
-            where: {
-              email,
-            },
-          });
-          if (!userExists) {
-            return null;
-          }
-
-          // Compare Password
-          const passwordMatch = await compare(password, userExists.password);
-          if (!passwordMatch) {
-            return null;
-          }
-
-          // Generate JWT if credentials are valid
-          const token = generateJWT({
-            id: userExists.id.toString(),
-            email: userExists.email,
-          });
-          cookies().set("token", token);
-
-          // Return User
+        if (user !== null) {
           return {
-            id: userExists.id.toString(),
-            email: userExists.email,
+            id: user.id,
+            email: user.email,
           };
-        } catch (error) {
-          console.log(error);
-          return null;
         }
+
+        return null;
       },
     }),
     GoogleCredentials({
@@ -87,6 +73,24 @@ export const authOptions = {
       clientId: process.env.GITHUB_CLIENT_ID!,
     }),
   ],
+  secret: process.env.SECRET_KEY || "SeCr3T",
+  callbacks: {
+    jwt: async ({ token, user }: any) => {
+      if (user) {
+        token.id = user.id;
+        token.token = user.token || "undefined";
+        token.displayName = user.displayName || "undefined";
+      }
+      return token;
+    },
+    session: async ({ session, token }: any) => {
+      if (session?.user) {
+        session.user.id = token.id;
+        session.user.displayName = token.displayName;
+      }
+      return session;
+    },
+  },
   pages: {
     signIn: "/login",
   },

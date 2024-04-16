@@ -8,13 +8,11 @@ datasource db {
 }
 
 model User {
-  id             Int     @id @default(autoincrement())
-  firstName      String?
-  lastName       String?
-  email          String  @unique
-  password       String
-  profilePicture String?
-  role           String  @default("USER")
+  id          Int     @id @default(autoincrement())
+  displayName String
+  email       String  @unique
+  password    String
+  token       String?
 }
 
 model otp {
@@ -27,11 +25,9 @@ model otp {
 }
 
 model unverifiedUser {
-  id             Int      @id @default(autoincrement())
-  firstName      String?
-  lastName       String?
-  email          String   @unique
-  password       String
-  profilePicture String?
-  expiresAt      DateTime
+  id          Int      @id @default(autoincrement())
+  displayName String
+  email       String   @unique
+  password    String
+  expiresAt   DateTime
 }
